@@ -9,7 +9,8 @@ build or test workflow to run yet.
 If you want to help before the extraction happens, the most useful contribution is
 discussion: open an issue if you have thoughts on the planned shape (the
 `UActorComponent` API, the server-event delegate, the auth token delegate — see
-`README.md`).
+`README.md`). Check the [project board](https://github.com/users/Zarrock77/projects/9)
+first — it might already be tracked.
 
 ## Once there's code
 

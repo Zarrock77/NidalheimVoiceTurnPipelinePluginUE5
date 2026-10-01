@@ -29,6 +29,11 @@ Planned shape, subject to change once the extraction actually happens:
 - Sample rates, reconnect timing, and base URLs as configurable properties
   instead of hardcoded constants.
 
+## Roadmap
+
+Tracked as issues on the [project board](https://github.com/users/Zarrock77/projects/9).
+The extraction itself is the big item; everything else here is scaffolding around it.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
