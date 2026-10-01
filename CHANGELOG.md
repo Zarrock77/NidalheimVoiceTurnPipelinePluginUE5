@@ -4,6 +4,18 @@ All notable changes to this plugin are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- 3D voice (`bSpatialize`, `SpatialMinDistance`, `SpatialMaxDistance`, `SpatialRolloff`): distance
+  attenuation and left/right balance inside the miniaudio playback path, with no added latency.
+  `SourceLocationProvider` tells the plugin where the speaker is when the owning actor is not its body.
+  Off by default.
+
+### Changed
+- The playback device is now stereo (the TTS stream is still 24 kHz mono). A centered voice is exactly as
+  loud as before.
+
 ## [0.1.0] - 2026-10-01
 
 First public release (beta), extracted from Nidalheim's `ANidalheimNPCCharacter`.

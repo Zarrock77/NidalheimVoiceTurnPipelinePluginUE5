@@ -1,5 +1,8 @@
 #include "NidalheimVoiceTurnPipelineComponent.h"
 #include "NidalheimSpeechPlaybackBuffer.h"
+#include "NidalheimVoiceSpatializer.h"
+#include "GameFramework/Actor.h"
+#include "GameFramework/PlayerController.h"
 #include "IWebSocket.h"
 #include "WebSocketsModule.h"
 #include "Modules/ModuleManager.h"
@@ -35,6 +38,10 @@ namespace
     // any conversion to the playback device's native rate.
     constexpr ma_uint32 kPlaybackSampleRate = 24000;
     constexpr ma_uint32 kPlaybackChannels = 1;
+    // The device itself is stereo so the voice can be balanced; the TTS stream stays mono.
+    constexpr ma_uint32 kOutputChannels = 2;
+    // How often the speaker/listener positions are republished to the audio thread.
+    constexpr float kSpatialUpdateSeconds = 1.f / 30.f;
     static_assert(kPlaybackSampleRate == FNidalheimSpeechPlaybackBuffer::SampleRate);
 
     // Voice volume (0..1), shared by every pipeline: the setting belongs to the player, not to a
@@ -797,13 +804,36 @@ void UNidalheimVoiceTurnPipelineComponent::OnAudioMessageReceived(const FString&
     }
 }
 
-// Device-owned callback. The queue outlives this device; no UObject access on the audio thread.
+// What the playback callback needs. Outlives the device; no UObject access on the audio thread.
+struct FNidalheimPlaybackContext
+{
+    FNidalheimSpeechPlaybackBuffer* Buffer = nullptr;
+    FNidalheimVoiceSpatializer Spatializer;
+};
+
 static void NidalheimMiniaudioPlaybackCallback(ma_device* pDevice, void* pOutput, const void* /*pInput*/, ma_uint32 frameCount)
 {
     if (!pDevice || !pOutput || frameCount == 0) return;
-    auto* Buffer = static_cast<FNidalheimSpeechPlaybackBuffer*>(pDevice->pUserData);
-    if (Buffer) Buffer->Render(pOutput, frameCount, FPlatformTime::Seconds());
-    else FMemory::Memzero(pOutput, SIZE_T(frameCount) * sizeof(int16));
+    auto* Context = static_cast<FNidalheimPlaybackContext*>(pDevice->pUserData);
+    if (!Context || !Context->Buffer)
+    {
+        FMemory::Memzero(pOutput, SIZE_T(frameCount) * kOutputChannels * sizeof(int16));
+        return;
+    }
+
+    // Render the mono voice into a fixed scratch block (no allocation on the audio thread), then
+    // place it in the stereo field. Blocks are ~120 frames; the loop only guards bigger periods.
+    constexpr ma_uint32 ScratchFrames = 1024;
+    int16 Scratch[ScratchFrames];
+    int16* Out = static_cast<int16*>(pOutput);
+    const double Now = FPlatformTime::Seconds();
+    for (ma_uint32 Done = 0; Done < frameCount;)
+    {
+        const ma_uint32 Count = FMath::Min(frameCount - Done, ScratchFrames);
+        Context->Buffer->Render(Scratch, Count, Now);
+        Context->Spatializer.MixToStereo(Scratch, Out + SIZE_T(Done) * kOutputChannels, Count);
+        Done += Count;
+    }
 }
 
 void UNidalheimVoiceTurnPipelineComponent::EnsureMiniAudioPlaybackStarted()
@@ -814,13 +844,15 @@ void UNidalheimVoiceTurnPipelineComponent::EnsureMiniAudioPlaybackStarted()
     TearDownMiniAudioPlayback();
 
     SpeechPlaybackBuffer = new FNidalheimSpeechPlaybackBuffer();
+    PlaybackContext = new FNidalheimPlaybackContext();
+    PlaybackContext->Buffer = SpeechPlaybackBuffer;
 
     ma_device_config Config = ma_device_config_init(ma_device_type_playback);
     Config.playback.format = ma_format_s16;
-    Config.playback.channels = kPlaybackChannels;
+    Config.playback.channels = kOutputChannels;
     Config.sampleRate = kPlaybackSampleRate;
     Config.dataCallback = &NidalheimMiniaudioPlaybackCallback;
-    Config.pUserData = SpeechPlaybackBuffer;
+    Config.pUserData = PlaybackContext;
     Config.performanceProfile = ma_performance_profile_low_latency;
 
     // 5 ms periods x 2 = ~10 ms playback-thread budget. WASAPI shared layer
@@ -868,10 +900,43 @@ void UNidalheimVoiceTurnPipelineComponent::EnsureMiniAudioPlaybackStarted()
     // The device is born at full volume: re-apply the player's voice setting immediately, otherwise
     // a device recreated mid-game would ignore the menu slider.
     ApplyVoicePlaybackVolume();
+    UpdateSpatialization();
     if (UWorld* World = GetWorld())
+    {
         World->GetTimerManager().SetTimer(SpeechStatsTimer, this, &UNidalheimVoiceTurnPipelineComponent::LogSpeechPlaybackStats, 1.0f, true);
-    UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("miniaudio playback started (WASAPI shared, %u Hz mono PCM16, period=%u frames)"),
+        World->GetTimerManager().SetTimer(SpatialTimer, this, &UNidalheimVoiceTurnPipelineComponent::UpdateSpatialization, kSpatialUpdateSeconds, true);
+    }
+    UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("miniaudio playback started (WASAPI shared, %u Hz mono PCM16 voice on a stereo device, period=%u frames)"),
         kPlaybackSampleRate, Config.periodSizeInFrames);
+}
+
+void UNidalheimVoiceTurnPipelineComponent::UpdateSpatialization()
+{
+    if (!PlaybackContext) return;
+
+    float Gain = 1.f;
+    float Pan = 0.f;
+
+    UWorld* World = GetWorld();
+    APlayerController* Controller = World ? World->GetFirstPlayerController() : nullptr;
+    if (bSpatialize && Controller)
+    {
+        FVector Source = FVector::ZeroVector;
+        bool bHasSource = false;
+        if (SourceLocationProvider.IsBound()) bHasSource = SourceLocationProvider.Execute(Source);
+        else if (const AActor* Owner = GetOwner()) { Source = Owner->GetActorLocation(); bHasSource = true; }
+
+        if (bHasSource)
+        {
+            FVector ListenerLocation;
+            FRotator ListenerRotation;
+            Controller->GetPlayerViewPoint(ListenerLocation, ListenerRotation);
+            const FVector ListenerRight = FRotationMatrix(ListenerRotation).GetScaledAxis(EAxis::Y);
+            FNidalheimVoiceSpatializer::Compute(Source, ListenerLocation, ListenerRight,
+                SpatialMinDistance, SpatialMaxDistance, SpatialRolloff, Gain, Pan);
+        }
+    }
+    PlaybackContext->Spatializer.SetTarget(Gain, Pan);
 }
 
 void UNidalheimVoiceTurnPipelineComponent::SetVoicePlaybackVolume(float Volume)
@@ -899,7 +964,11 @@ void UNidalheimVoiceTurnPipelineComponent::ApplyVoicePlaybackVolume() const
 
 void UNidalheimVoiceTurnPipelineComponent::TearDownMiniAudioPlayback()
 {
-    if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(SpeechStatsTimer);
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(SpeechStatsTimer);
+        World->GetTimerManager().ClearTimer(SpatialTimer);
+    }
     if (MiniAudioPlaybackDevice)
     {
         ma_device* Device = static_cast<ma_device*>(MiniAudioPlaybackDevice);
@@ -908,6 +977,9 @@ void UNidalheimVoiceTurnPipelineComponent::TearDownMiniAudioPlayback()
         FMemory::Free(MiniAudioPlaybackDevice);
         MiniAudioPlaybackDevice = nullptr;
     }
+    // The device is stopped: neither the context nor the queue can be read any more.
+    delete PlaybackContext;
+    PlaybackContext = nullptr;
     delete SpeechPlaybackBuffer;
     SpeechPlaybackBuffer = nullptr;
     LastCompletedSpeechReplies = LastSpeechUnderruns = 0;
