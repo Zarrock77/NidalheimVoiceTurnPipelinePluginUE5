@@ -10,7 +10,7 @@
     "SupportURL": "https://github.com/Zarrock77/NidalheimVoiceTurnPipelinePluginUE5",
     "EngineVersion": "5.8.0",
     "CanContainContent": false,
-    "IsBetaVersion": true,
+    "IsBetaVersion": false,
     "IsExperimentalVersion": false,
     "Installed": false,
     "Modules": [
