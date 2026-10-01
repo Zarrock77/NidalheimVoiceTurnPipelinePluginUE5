@@ -1,5 +1,5 @@
 name: Bug
-description: Something doesn't behave the way it should (once there's plugin code)
+description: Something doesn't behave the way it should
 labels: ["bug"]
 body:
   - type: markdown
@@ -7,14 +7,11 @@ body:
       value: |
         **Don't report a security vulnerability here.** See [SECURITY.md](../blob/main/SECURITY.md).
 
-        This repo has no plugin code yet (see README.md) -- this template is here
-        for when it does.
-
   - type: input
     id: version
     attributes:
       label: Commit or tag
-      placeholder: "a short commit SHA, or a release tag once there is one"
+      placeholder: "a short commit SHA, or a release tag"
     validations:
       required: true
 

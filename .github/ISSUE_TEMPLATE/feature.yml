@@ -25,7 +25,7 @@ body:
         This plugin is meant to be vendor- and transport-agnostic, and usable with
         any auth system (via a pluggable token delegate, not a hard dependency on a
         specific one). A proposal that couples it to a specific host game or auth
-        flow is likely out of scope -- see README.md "Planned shape".
+        flow is likely out of scope -- see README.md.
       options:
         - label: This keeps the plugin reusable outside the Nidalheim project
           required: true
@@ -34,4 +34,4 @@ body:
     id: impact
     attributes:
       label: Impact
-      description: Affects the planned public API (the UActorComponent's delegates/UFUNCTIONs)?
+      description: Affects the public API (the component's properties, delegates and functions)? Breaking for existing hosts?
