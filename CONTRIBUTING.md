@@ -40,7 +40,8 @@ rescans the full history on every push/PR.
 
 ## Branches and commits
 
-- Work off a feature branch, not `main` directly.
+- Work off a feature branch, not `main` directly — `main` is protected, a direct
+  `git push` to it is rejected by GitHub, including for the maintainer.
 - Commit messages: a short, descriptive summary line; explain *why* in the body when
   it isn't obvious from the diff.
 
@@ -48,7 +49,11 @@ rescans the full history on every push/PR.
 
 - Keep them small and focused.
 - Describe what changed and why; link any related issue.
-- A maintainer reviews before merging.
+- Branch protection requires the `Scan git history` (gitleaks) check to pass and be
+  up to date with `main` before a PR is mergeable (more checks will be added once
+  there's a CI build workflow). No human approval is required by GitHub
+  (solo-maintainer project), but the maintainer may still comment or ask for changes
+  before merging.
 
 ## Contact
 
