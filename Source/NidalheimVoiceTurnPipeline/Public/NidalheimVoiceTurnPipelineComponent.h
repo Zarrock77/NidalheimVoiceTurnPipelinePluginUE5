@@ -8,6 +8,7 @@
 
 class IWebSocket;
 class FNidalheimSpeechPlaybackBuffer;
+struct FNidalheimPlaybackContext;
 
 /** Which WebSocket a server event arrived on. */
 UENUM(BlueprintType)
@@ -42,6 +43,13 @@ DECLARE_DELEGATE_TwoParams(FNidalheimVoiceTurnTokenReady, bool /*bSuccess*/, con
  * plugin has no dependency on any particular one. It must eventually call `OnReady` exactly once.
  */
 DECLARE_DELEGATE_OneParam(FNidalheimVoiceTurnTokenProvider, FNidalheimVoiceTurnTokenReady /*OnReady*/);
+
+/**
+ * "Where is the voice coming from?" Fill `OutLocation` with the world position of the speaker and
+ * return true, or return false when there is no sensible source right now (the voice is then
+ * played centered at full volume). Called ~30 times per second on the game thread: keep it cheap.
+ */
+DECLARE_DELEGATE_RetVal_OneParam(bool, FNidalheimVoiceTurnSourceLocationProvider, FVector& /*OutLocation*/);
 
 /**
  * Voice-turn client: a text WebSocket and an audio WebSocket to a voice-turn backend
@@ -107,6 +115,33 @@ public:
      */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoiceTurn|Audio", meta = (ClampMin = "8000", ClampMax = "96000"))
     int32 CaptureSampleRate = 48000;
+
+    /**
+     * Play the voice in 3D: attenuated with the distance between the speaker and the player's
+     * view, and balanced left/right. Done inside the miniaudio playback path (no engine AudioMixer),
+     * so it adds no latency. Off by default: the voice is then centered at full volume.
+     * Not covered: occlusion, reverb, HRTF.
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoiceTurn|Spatialization")
+    bool bSpatialize = false;
+
+    /** Inside this distance (cm) the voice is at full volume. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoiceTurn|Spatialization", meta = (ClampMin = "0", EditCondition = "bSpatialize"))
+    float SpatialMinDistance = 200.f;
+
+    /** Past this distance (cm) the voice is silent. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoiceTurn|Spatialization", meta = (ClampMin = "1", EditCondition = "bSpatialize"))
+    float SpatialMaxDistance = 1500.f;
+
+    /** Falloff shape between the two distances: 1 is linear, higher fades faster. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoiceTurn|Spatialization", meta = (ClampMin = "0.1", ClampMax = "4", EditCondition = "bSpatialize"))
+    float SpatialRolloff = 1.5f;
+
+    /**
+     * Where the voice comes from. Unbound: the owning actor's location. Bind it when the pipeline
+     * actor is not the speaker's body (a hidden "brain" actor driving several characters).
+     */
+    FNidalheimVoiceTurnSourceLocationProvider SourceLocationProvider;
 
     /** Host-provided token source. */
     FNidalheimVoiceTurnTokenProvider TokenProvider;
@@ -187,6 +222,9 @@ private:
     void* MiniAudioDevice = nullptr;
     void* MiniAudioPlaybackDevice = nullptr;
     FNidalheimSpeechPlaybackBuffer* SpeechPlaybackBuffer = nullptr;
+    // What the playback callback reads (queue + spatializer). Freed after the device is stopped.
+    FNidalheimPlaybackContext* PlaybackContext = nullptr;
+    FTimerHandle SpatialTimer;
     FString ActiveAudioRequestId;
     bool bRejectAudioReply = false;
     FTimerHandle SpeechStatsTimer;
@@ -239,6 +277,8 @@ private:
     void EnsureMiniAudioPlaybackStarted();
     void TearDownMiniAudioPlayback();
     void ApplyVoicePlaybackVolume() const;
+    // Publishes gain/balance for the current speaker and listener positions (~30 Hz).
+    void UpdateSpatialization();
     void ResetSpeechPlayback();
     void LogSpeechPlaybackStats();
 
