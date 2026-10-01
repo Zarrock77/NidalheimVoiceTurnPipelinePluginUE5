@@ -1,0 +1,65 @@
+#!/bin/sh
+# Refuse a commit that contains a secret.
+# Enable: ./scripts/install-git-hooks.sh  (or `git config core.hooksPath .githooks`)
+#
+# One-off bypass (only on an already-analyzed false positive):
+#   git commit --no-verify
+# Make the absence of gitleaks itself blocking:
+#   git config gitleaksRequired true
+
+REPO_ROOT=$(git rev-parse --show-toplevel) || exit 0
+cd "$REPO_ROOT" || exit 0
+
+GITLEAKS_IMAGE="ghcr.io/gitleaks/gitleaks:v8.30.1"
+# 2 = secret found; any other non-zero code = tooling problem.
+LEAK_EXIT=2
+ARGS="git --staged --config .gitleaks.toml --redact --no-banner --verbose --exit-code $LEAK_EXIT"
+
+if [ -n "$GITLEAKS_BIN" ] && [ -x "$GITLEAKS_BIN" ]; then
+  # shellcheck disable=SC2086
+  "$GITLEAKS_BIN" $ARGS
+  status=$?
+elif command -v gitleaks >/dev/null 2>&1; then
+  # shellcheck disable=SC2086
+  gitleaks $ARGS
+  status=$?
+elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$REPO_ROOT:/repo" --entrypoint sh "$GITLEAKS_IMAGE" \
+    -c "git config --global --add safe.directory /repo && cd /repo && exec gitleaks $ARGS"
+  status=$?
+else
+  status=127
+fi
+
+[ "$status" -eq 0 ] && exit 0
+
+if [ "$status" -eq "$LEAK_EXIT" ]; then
+  cat >&2 <<'MSG'
+
+Commit refused: gitleaks found at least one secret in the staged files.
+
+  1. Remove the value from the code and read it from an environment variable instead.
+  2. If it was already pushed: revoke it and rotate it with the provider.
+  3. False positive? Re-run with --report-path to get the fingerprint, then add it
+     to .gitleaksignore with a justification line.
+
+MSG
+  exit 1
+fi
+
+if [ "$status" -eq 127 ]; then
+  reason="gitleaks not found (no binary, no Docker)"
+else
+  reason="gitleaks exited with code $status without scanning"
+fi
+
+msg="$reason -- commit was NOT scanned.
+  Install: https://github.com/gitleaks/gitleaks/releases (or start Docker Desktop)"
+
+if [ "$(git config --bool gitleaksRequired 2>/dev/null)" = "true" ]; then
+  echo "ERROR: $msg" >&2
+  exit 1
+fi
+
+echo "WARNING: $msg" >&2
+exit 0

@@ -1,0 +1,12 @@
+# Gitleaks config for NidalheimVoiceTurnPipelinePluginUE5.
+# Docs: https://github.com/gitleaks/gitleaks#configuration
+#
+# Scan full history:        gitleaks git   --config .gitleaks.toml -v
+# Scan the staged index:    gitleaks git   --config .gitleaks.toml --staged -v
+# Scan the working tree:    gitleaks dir . --config .gitleaks.toml -v
+
+title = "NidalheimVoiceTurnPipelinePluginUE5"
+
+[extend]
+# Default gitleaks ruleset (~170 rules: AWS, GitHub, Stripe, PEM private keys, JWTs...).
+useDefault = true

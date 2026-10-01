@@ -1,0 +1,82 @@
+name: Secret scan (gitleaks)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Full weekly sweep: a rule added later can reveal an old leak nobody has
+    # rescanned for since.
+    - cron: '31 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+
+jobs:
+  scan:
+    name: Scan git history
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks scans history: a shallow clone would make it blind.
+          fetch-depth: 0
+
+      - name: Install gitleaks ${{ env.GITLEAKS_VERSION }}
+        run: |
+          set -euo pipefail
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o /tmp/gitleaks.tar.gz "$url"
+          echo "${GITLEAKS_SHA256}  /tmp/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Scan
+        id: scan
+        continue-on-error: true
+        run: |
+          gitleaks git \
+            --config .gitleaks.toml \
+            --redact \
+            --exit-code 2 \
+            --report-format sarif \
+            --report-path gitleaks.sarif \
+            --verbose
+
+      - name: Publish SARIF to code scanning
+        if: always() && hashFiles('gitleaks.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks
+
+      - name: Keep the report as an artifact
+        if: always() && hashFiles('gitleaks.sarif') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report-${{ github.run_id }}
+          path: gitleaks.sarif
+          retention-days: 30
+
+      - name: Fail the build on findings
+        if: steps.scan.outcome == 'failure'
+        run: |
+          echo "::error title=Secret detected::gitleaks found at least one secret. See the SARIF report (Security tab) or the job artifact."
+          echo "Procedure: 1) revoke and rotate the key with the provider, 2) remove it from the code," >&2
+          echo "3) rewrite history if it's in there (git filter-repo), 4) if it's a false positive," >&2
+          echo "   add its fingerprint to .gitleaksignore with a justification." >&2
+          exit 1

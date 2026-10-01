@@ -24,6 +24,20 @@ This will be a standard Unreal Engine 5 plugin:
 
 This section will be rewritten with real instructions once there's something to build.
 
+## Secret scanning
+
+```bash
+git clone https://github.com/Zarrock77/NidalheimVoiceTurnPipelinePluginUE5.git
+cd NidalheimVoiceTurnPipelinePluginUE5
+./scripts/install-git-hooks.sh
+```
+
+Enables a pre-commit hook that scans staged changes for secrets with
+[gitleaks](https://github.com/gitleaks/gitleaks) (falls back to Docker if the binary
+isn't installed, warns instead of blocking if neither is available). Worth doing even
+with no plugin code yet — it protects config and workflow files from day one. CI also
+rescans the full history on every push/PR.
+
 ## Branches and commits
 
 - Work off a feature branch, not `main` directly.
