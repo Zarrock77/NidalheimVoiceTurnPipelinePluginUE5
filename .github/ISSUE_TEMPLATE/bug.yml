@@ -1,0 +1,50 @@
+name: Bug
+description: Something doesn't behave the way it should (once there's plugin code)
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Don't report a security vulnerability here.** See [SECURITY.md](../blob/main/SECURITY.md).
+
+        This repo has no plugin code yet (see README.md) -- this template is here
+        for when it does.
+
+  - type: input
+    id: version
+    attributes:
+      label: Commit or tag
+      placeholder: "a short commit SHA, or a release tag once there is one"
+    validations:
+      required: true
+
+  - type: input
+    id: ue-version
+    attributes:
+      label: Unreal Engine version
+      placeholder: "5.8.2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered, from a clean project to the problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Compiler/linker errors, log output, crash callstack. **Redact any tokens or API keys.**
+    validations:
+      required: true

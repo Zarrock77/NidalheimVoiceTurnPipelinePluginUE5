@@ -1,0 +1,37 @@
+name: Feature request
+description: Propose an improvement or a new capability
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: The need, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      description: >-
+        This plugin is meant to be vendor- and transport-agnostic, and usable with
+        any auth system (via a pluggable token delegate, not a hard dependency on a
+        specific one). A proposal that couples it to a specific host game or auth
+        flow is likely out of scope -- see README.md "Planned shape".
+      options:
+        - label: This keeps the plugin reusable outside the Nidalheim project
+          required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Affects the planned public API (the UActorComponent's delegates/UFUNCTIONs)?

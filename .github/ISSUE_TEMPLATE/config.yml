@@ -1,0 +1,7 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/Zarrock77/NidalheimVoiceTurnPipelinePluginUE5/security/advisories/new
+    about: >-
+      Never open a public issue for a vulnerability. Use private reporting --
+      see SECURITY.md.
