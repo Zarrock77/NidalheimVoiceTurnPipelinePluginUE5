@@ -26,15 +26,16 @@ guideline: an initial acknowledgment within **7 days**, and a plan (fix, timelin
 explanation) within **30 days** of a confirmed report. Credit is given to reporters in
 the advisory/release notes unless you ask to stay anonymous.
 
-## Current status
+## Sensitive areas
 
-This repo has no plugin code yet (see `README.md`) — there is currently nothing to
-exploit here beyond the repository/CI configuration itself. This policy is in place
-ahead of the actual code so it's ready once the extraction happens.
+The plugin handles an access token (it appears in the WebSocket URL query string, as the backend
+protocol requires) and streams microphone audio to the configured backend. Reports about token
+handling, logging of sensitive values, or audio capture/transmission outside of an explicit
+push-to-talk are especially welcome.
 
 ## Scope
 
-This policy covers the code in this repository, once it exists. It does not cover
+This policy covers the code in this repository. It does not cover
 vulnerabilities in Unreal Engine itself, third-party plugins, or the host game project
 this plugin is extracted from ([Zarrock77/Nidalheim](https://github.com/Zarrock77/Nidalheim),
 private).

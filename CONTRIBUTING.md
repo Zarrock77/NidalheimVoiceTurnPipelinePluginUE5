@@ -1,28 +1,22 @@
 # Contributing
 
-## Current status
+## Working on the plugin
 
-This repo currently has **no plugin code** — it reserves the name, license, and
-governance files ahead of the actual extraction work (see `README.md`). There isn't a
-build or test workflow to run yet.
+This is a standard Unreal Engine 5 plugin (Windows only, see `README.md`):
 
-If you want to help before the extraction happens, the most useful contribution is
-discussion: open an issue if you have thoughts on the planned shape (the
-`UActorComponent` API, the server-event delegate, the auth token delegate — see
-`README.md`). Check the [project board](https://github.com/users/Zarrock77/projects/9)
-first — it might already be tracked.
+- Put the repo in a UE5 project's `Plugins/` folder (clone it there, or add it as a submodule) and
+  enable `NidalheimVoiceTurnPipeline` in the `.uproject`.
+- Build the project's editor target (Visual Studio, or `Build.bat <Project>Editor Win64 Development`).
+- Run the automation tests from the editor (Session Frontend > Automation, filter `NidalheimVoiceTurnPipeline`)
+  or headless:
+  `UnrealEditor.exe <Project>.uproject -ExecCmds="Automation RunTests NidalheimVoiceTurnPipeline; Quit" -unattended -nullrhi`.
+- There is no CI build: GitHub-hosted runners can't build against Unreal Engine. State in your pull request
+  which engine version you built and tested with, and what you checked in PIE.
+- A real round trip (microphone, backend, authentication) can't be automated: if your change touches audio
+  capture/playback or the WebSocket handling, say how you verified it by hand.
 
-## Once there's code
-
-This will be a standard Unreal Engine 5 plugin:
-
-- Clone into a UE5 project's `Plugins/` directory, or add as a submodule.
-- Build via the project's `.sln` (Visual Studio) or the editor's own compile step.
-- No automated test suite is planned beyond what's realistic for a UE5 plugin without
-  a full project to run it in (likely a small host project for manual / PIE
-  verification).
-
-This section will be rewritten with real instructions once there's something to build.
+The plugin must stay reusable outside the game it was extracted from: no assumption about a specific host
+project, auth system or backend beyond the documented wire protocol.
 
 ## Secret scanning
 
@@ -34,9 +28,8 @@ cd NidalheimVoiceTurnPipelinePluginUE5
 
 Enables a pre-commit hook that scans staged changes for secrets with
 [gitleaks](https://github.com/gitleaks/gitleaks) (falls back to Docker if the binary
-isn't installed, warns instead of blocking if neither is available). Worth doing even
-with no plugin code yet — it protects config and workflow files from day one. CI also
-rescans the full history on every push/PR.
+isn't installed, warns instead of blocking if neither is available). CI also rescans the
+full history on every push/PR.
 
 ## Branches and commits
 
@@ -50,8 +43,7 @@ rescans the full history on every push/PR.
 - Keep them small and focused.
 - Describe what changed and why; link any related issue.
 - Branch protection requires the `Scan git history` (gitleaks) check to pass and be
-  up to date with `main` before a PR is mergeable (more checks will be added once
-  there's a CI build workflow). No human approval is required by GitHub
+  up to date with `main` before a PR is mergeable (there is no CI build, see above). No human approval is required by GitHub
   (solo-maintainer project), but the maintainer may still comment or ask for changes
   before merging.
 

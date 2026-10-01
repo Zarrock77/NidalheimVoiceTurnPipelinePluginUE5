@@ -1,0 +1,26 @@
+{
+    "FileVersion": 3,
+    "FriendlyName": "Voice Turn Pipeline",
+    "Description": "Voice-turn WebSocket client component: text + audio WebSocket channels, low-latency push-to-talk capture and TTS playback (miniaudio/WASAPI), and the generic voice-turn wire protocol. Host games plug in their own auth (token provider delegate) and their own server events (unhandled-event delegate). Windows only.",
+    "Category": "Audio",
+    "CreatedBy": "Zarrock77",
+    "CreatedByURL": "https://github.com/Zarrock77",
+    "DocsURL": "",
+    "MarketplaceURL": "",
+    "SupportURL": "https://github.com/Zarrock77/NidalheimVoiceTurnPipelinePluginUE5",
+    "EngineVersion": "5.8.0",
+    "CanContainContent": false,
+    "IsBetaVersion": true,
+    "IsExperimentalVersion": false,
+    "Installed": false,
+    "Modules": [
+        {
+            "Name": "NidalheimVoiceTurnPipeline",
+            "Type": "Runtime",
+            "LoadingPhase": "Default",
+            "PlatformAllowList": [
+                "Win64"
+            ]
+        }
+    ]
+}
