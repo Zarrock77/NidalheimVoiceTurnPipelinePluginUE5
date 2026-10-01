@@ -29,6 +29,14 @@ Planned shape, subject to change once the extraction actually happens:
 - Sample rates, reconnect timing, and base URLs as configurable properties
   instead of hardcoded constants.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for how to report a vulnerability privately.
+
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).
