@@ -58,14 +58,40 @@ WebsocketTextBaseUrl="wss://my-backend.example.com/text"
 WebsocketAudioBaseUrl="wss://my-backend.example.com/audio"
 ```
 
-Then on the actor that talks to the agent:
+Then on the actor that talks to the agent. The header first: the include and the `UFUNCTION` macros are
+required, because `AddDynamic` only binds to `UFUNCTION`s.
 
 ```cpp
-// Constructor
+// MyActor.h
+#include "GameFramework/Actor.h"
+#include "NidalheimVoiceTurnPipelineComponent.h"
+#include "MyActor.generated.h"
+
+UCLASS()
+class MYPROJECT_API AMyActor : public AActor
+{
+    GENERATED_BODY()
+public:
+    AMyActor();
+    virtual void BeginPlay() override;
+
+    UPROPERTY(VisibleAnywhere)
+    TObjectPtr<UNidalheimVoiceTurnPipelineComponent> Voice;
+
+    UFUNCTION() void HandleReply(const FString& Message);
+    UFUNCTION() void HandleTranscript(const FString& Transcription);
+};
+```
+
+Then the implementation. `MyAuth` stands for **your own** authentication code, it is not part of the plugin:
+all the plugin needs is a token handed to `OnReady`.
+
+```cpp
+// MyActor.cpp, constructor
 Voice = CreateDefaultSubobject<UNidalheimVoiceTurnPipelineComponent>(TEXT("Voice"));
 Voice->bAutoConnect = false;                // or leave it on and wire everything before BeginPlay
 
-// BeginPlay, before Connect()
+// MyActor.cpp, BeginPlay(), before Connect()
 Voice->AgentId = TEXT("olaf");              // sent as ?npc=olaf (see AgentQueryParam)
 Voice->TokenProvider.BindLambda([](FNidalheimVoiceTurnTokenReady OnReady)
 {
