@@ -1,0 +1,80 @@
+name: Installation test report
+description: You installed the NidalheimVoiceTurnPipeline plugin from the README. Tell us how it went, even if it went well.
+title: "Installation test: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for trying this. The point is to find what the documentation does not say, so
+        **please do not skip a step because you can guess it**: write down what you actually had to figure out.
+
+        Follow the README only. If you had to look elsewhere (search engine, another repository, a person),
+        say what and why below.
+
+  - type: dropdown
+    id: relation
+    attributes:
+      label: Do you know this project?
+      options:
+        - I had never heard of it before today
+        - I know the project or its authors
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Your environment
+      description: Operating system and the versions of the tools you used.
+      placeholder: "Windows 11, Unreal Engine 5.8, Visual Studio 2022"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version you installed
+      placeholder: "a release tag or a short commit SHA"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - It worked without any help
+        - It worked after I got past a blocker
+        - It did not work
+    validations:
+      required: true
+
+  - type: input
+    id: duration
+    attributes:
+      label: Time from first reading the README to a project that compiles with the plugin
+      placeholder: "for example 12 minutes"
+    validations:
+      required: true
+
+  - type: textarea
+    id: blockers
+    attributes:
+      label: Where you got stuck
+      description: For each blocker, the step, the exact message or symptom, and what you did about it.
+      placeholder: |
+        1. Step "...", message "...", I fixed it by ...
+
+  - type: textarea
+    id: missing
+    attributes:
+      label: What the documentation should have told you
+      description: Prerequisites, versions, steps, words you did not know.
+
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Credit
+      options:
+        - label: You may list me in CONTRIBUTORS.md for this report (I can give a name or a handle in the comments).
