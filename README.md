@@ -191,6 +191,10 @@ How decisions are made: [GOVERNANCE.md](GOVERNANCE.md).
 
 ## Contributing
 
+**Just tried to install it?** Tell us how it went, even if it went well: open an issue with the
+[Installation test report](../../issues/new?template=install-test.yml) form. What you had to guess is what the
+documentation is missing.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Security
