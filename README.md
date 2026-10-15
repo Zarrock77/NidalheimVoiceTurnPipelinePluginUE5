@@ -154,7 +154,9 @@ round trip (microphone, backend, login) can only be checked by hand in PIE.
 
 ## Roadmap
 
-Tracked as issues on the [project board](https://github.com/users/Zarrock77/projects/9).
+What is planned and what is open to contributions: [ROADMAP.md](ROADMAP.md). Newcomers: look for the
+[`good first issue`](../../issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) label.
+How decisions are made: [GOVERNANCE.md](GOVERNANCE.md).
 
 ## Third-party
 
