@@ -51,3 +51,34 @@ full history on every push/PR.
 
 Open an issue, or reach out via GitHub ([@Zarrock77](https://github.com/Zarrock77)).
 See [SECURITY.md](SECURITY.md) instead for vulnerability reports.
+
+
+## What we accept, and what we keep control of
+
+**Welcome without asking first:** Bug fixes, tests, documentation and examples; audio device selection; new platforms; performance and latency improvements that keep the public API compatible.
+
+**Please open an issue before writing code for:**
+
+- a change to the wire protocol: both this repository and
+  [nidalheim-voice-turn-pipeline](https://github.com/Zarrock77/NidalheimVoiceTurnPipelineBackendNodejs) implement it, so it has to stay compatible or be made in both;
+- the license, the release process or the repository configuration;
+- anything that ties the project to one specific game or backend.
+
+**We will decline:** changes that add game-specific logic, secrets or credentials, or code you do not have
+the right to contribute.
+
+## How fast we reply
+
+We aim to look at an issue or a pull request **within about a week**. This is a student team working
+part-time: it is a best-effort aim, not a guarantee. If nobody has answered after two weeks, comment on the
+thread to bring it back up.
+
+## Credit
+
+Every accepted contribution is credited in [CONTRIBUTORS.md](CONTRIBUTORS.md) and in the CHANGELOG entry of
+the release that ships it.
+
+## Governance and roadmap
+
+See [GOVERNANCE.md](GOVERNANCE.md) for how decisions are made and releases cut, and [ROADMAP.md](ROADMAP.md)
+for what is planned.
