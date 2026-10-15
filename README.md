@@ -161,6 +161,11 @@ Tracked as issues on the [project board](https://github.com/users/Zarrock77/proj
 [miniaudio](https://miniaud.io) by David Reid, vendored in `Source/NidalheimVoiceTurnPipeline/ThirdParty/miniaudio`
 (public domain or MIT-0, see the license at the end of `miniaudio.h`).
 
+## Open source scope
+
+What this repository opens, what stays closed, the license and third-party code:
+[docs/OPEN_SOURCE_SCOPE.md](docs/OPEN_SOURCE_SCOPE.md).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
