@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-15
+
 ### Added
 - 3D voice (`bSpatialize`, `SpatialMinDistance`, `SpatialMaxDistance`, `SpatialRolloff`): distance
   attenuation and left/right balance inside the miniaudio playback path, with no added latency.
@@ -39,4 +41,5 @@ Requires Unreal Engine 5.8, Windows (Win64) only.
 - Pairs with the Node.js backend package `nidalheim-voice-turn-pipeline`; a real
   end-to-end voice round-trip still has to be validated in a host project.
 
+[0.2.0]: https://github.com/Zarrock77/NidalheimVoiceTurnPipelinePluginUE5/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Zarrock77/NidalheimVoiceTurnPipelinePluginUE5/releases/tag/v0.1.0
