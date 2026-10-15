@@ -5,8 +5,8 @@ with an AI agent. It is the UE5 counterpart to
 [nidalheim-voice-turn-pipeline](https://github.com/Zarrock77/NidalheimVoiceTurnPipelineBackendNodejs)
 (the Node.js backend package) and speaks the same wire protocol.
 
-It was extracted from `ANidalheimNPCCharacter` in the [Nidalheim](https://github.com/Zarrock77/Nidalheim)
-game so that the voice client can be reused: it owns the networking and audio, and leaves the game
+It was extracted from `ANidalheimNPCCharacter` in the Nidalheim
+game (a closed-source project) so that the voice client can be reused: it owns the networking and audio, and leaves the game
 logic (quests, inventory, authentication...) to the host.
 
 ## What's in the box
