@@ -5,7 +5,7 @@
     "FriendlyName": "Voice Turn Pipeline",
     "Description": "Voice-turn WebSocket client component: text + audio WebSocket channels, low-latency push-to-talk capture and TTS playback (miniaudio/WASAPI), and the generic voice-turn wire protocol. Host games plug in their own auth (token provider delegate) and their own server events (unhandled-event delegate). Windows only.",
     "Category": "Audio",
-    "CreatedBy": "Zarrock77",
+    "CreatedBy": "Merwan Korkmaz, Jean-Jacques Delegue, Melvyn Gras, Aymeric Cazals de Fabel",
     "CreatedByURL": "https://github.com/Zarrock77",
     "DocsURL": "https://github.com/Zarrock77/NidalheimVoiceTurnPipelinePluginUE5#readme",
     "MarketplaceURL": "",
