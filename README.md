@@ -37,8 +37,14 @@ logic (quests, inventory, authentication...) to the host.
 
 ## Install
 
-1. Clone this repo into your project's `Plugins/` folder (any subfolder name works).
-2. Enable the plugin in your `.uproject`:
+The plugin is only the client: without a backend that speaks the protocol (see Requirements), it has nobody to
+talk to.
+
+1. Get the plugin, either way:
+   - **From Fab**: install it to your engine from the Epic Games Launcher (Fab Library → Install to Engine). It
+     lands in `Engine/Plugins/Marketplace/`.
+   - **From GitHub**: clone this repo into your project's `Plugins/` folder (any subfolder name works).
+2. Enable the plugin in your `.uproject` (or in Edit → Plugins):
    ```json
    { "Name": "NidalheimVoiceTurnPipeline", "Enabled": true }
    ```
