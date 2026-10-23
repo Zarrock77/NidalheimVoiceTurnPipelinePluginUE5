@@ -6,6 +6,9 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Plugin icon (`Resources/Icon128.png`) and install steps for Fab in the README.
+
 ## [0.2.0] - 2026-10-15
 
 ### Added
