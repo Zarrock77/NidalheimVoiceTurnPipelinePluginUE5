@@ -1,7 +1,7 @@
 {
     "FileVersion": 3,
-    "Version": 2,
-    "VersionName": "0.2.0",
+    "Version": 3,
+    "VersionName": "0.2.1",
     "FriendlyName": "Voice Turn Pipeline",
     "Description": "Voice-turn WebSocket client component: text + audio WebSocket channels, low-latency push-to-talk capture and TTS playback (miniaudio/WASAPI), and the generic voice-turn wire protocol. Host games plug in their own auth (token provider delegate) and their own server events (unhandled-event delegate). Windows only.",
     "Category": "Audio",
