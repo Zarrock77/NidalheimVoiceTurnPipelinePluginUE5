@@ -6,8 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-23
+
 ### Added
 - Plugin icon (`Resources/Icon128.png`) and install steps for Fab in the README.
+
+### Changed
+- The four team members are named as copyright holders in `LICENSE` and in the `.uplugin` `CreatedBy`.
 
 ## [0.2.0] - 2026-10-15
 
@@ -44,5 +49,6 @@ Requires Unreal Engine 5.8, Windows (Win64) only.
 - Pairs with the Node.js backend package `nidalheim-voice-turn-pipeline`; a real
   end-to-end voice round-trip still has to be validated in a host project.
 
+[0.2.1]: https://github.com/Zarrock77/NidalheimVoiceTurnPipelinePluginUE5/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Zarrock77/NidalheimVoiceTurnPipelinePluginUE5/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Zarrock77/NidalheimVoiceTurnPipelinePluginUE5/releases/tag/v0.1.0
