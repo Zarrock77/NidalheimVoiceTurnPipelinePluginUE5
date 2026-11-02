@@ -40,10 +40,8 @@ logic (quests, inventory, authentication...) to the host.
 The plugin is only the client: without a backend that speaks the protocol (see Requirements), it has nobody to
 talk to.
 
-1. Get the plugin, either way:
-   - **From Fab**: install it to your engine from the Epic Games Launcher (Fab Library → Install to Engine). It
-     lands in `Engine/Plugins/Marketplace/`.
-   - **From GitHub**: clone this repo into your project's `Plugins/` folder (any subfolder name works).
+1. Clone this repo into your project's `Plugins/` folder (any subfolder name works). The plugin is not published
+   on Fab yet.
 2. Enable the plugin in your `.uproject` (or in Edit → Plugins):
    ```json
    { "Name": "NidalheimVoiceTurnPipeline", "Enabled": true }
@@ -183,6 +181,18 @@ UnrealEditor.exe MyProject.uproject -ExecCmds="Automation RunTests NidalheimVoic
 
 They cover URL building, event routing, the token-provider contract, the playback buffer and the 3D mixing. A real
 round trip (microphone, backend, login) can only be checked by hand in PIE.
+
+## What it does not do
+
+- It is not a game system: no authentication, quests or inventory. You provide a token, the plugin provides the
+  voice.
+- Windows (Win64) only, and only tested with Unreal Engine 5.8. There is no macOS or Linux audio backend.
+- The 3D voice is distance attenuation and left/right balance only: no occlusion, reverb or HRTF.
+- Playback is fixed at 24 kHz mono, and the output device is chosen by the system: you cannot pick the capture or
+  playback device from the plugin yet.
+- There is no CI build, because GitHub runners cannot build against Unreal Engine. A real round trip (microphone,
+  backend, login) is checked by hand in PIE.
+- The `TokenProvider` delegate can only be bound from C++, not from Blueprint.
 
 ## Scope
 
