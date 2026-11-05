@@ -12,6 +12,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 - A late close or error from a replaced text socket (after `SetAgentId`) no longer resets the new one.
 
 ### Changed
+- The send queue of the text channel keeps at most 64 messages (the oldest is dropped) and is emptied by `SetAgentId`, whose messages were meant for the previous agent.
 - Reconnection uses an exponential backoff on both channels (`TextReconnectDelaySeconds`, then x2, capped at 30 s, reset on connection) instead of a fixed 0.5 s.
 - Connecting no longer does a blocking DNS lookup just to log the resolved address; the `Sockets` and `JsonUtilities` module dependencies are dropped.
 

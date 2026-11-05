@@ -327,8 +327,18 @@ void UNidalheimVoiceTurnPipelineComponent::SendRawJson(const FString& Json)
         return;
     }
     // Text channel down: keep the message, it is sent on the next OnTextConnected.
-    PendingTextSends.Add(Json);
+    AppendPendingSend(PendingTextSends, Json);
     ScheduleTextReconnect();
+}
+
+void UNidalheimVoiceTurnPipelineComponent::AppendPendingSend(TArray<FString>& Queue, const FString& Json)
+{
+    // Bounded so a long outage cannot grow the queue forever; the oldest message is the stalest.
+    if (Queue.Num() >= MaxPendingTextSends)
+    {
+        Queue.RemoveAt(0);
+    }
+    Queue.Add(Json);
 }
 
 bool UNidalheimVoiceTurnPipelineComponent::TrySendRawJson(const FString& Json)
@@ -369,6 +379,8 @@ void UNidalheimVoiceTurnPipelineComponent::SetAgentId(const FString& NewAgentId)
     UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Switching agent: %s -> %s"), *AgentId, *NewAgentId);
     AgentId = NewAgentId;
     ResetSpeechPlayback();
+    // Queued messages were meant for the previous agent.
+    PendingTextSends.Reset();
 
     CloseTextWebSocket();
     CloseAudioWebSocket();

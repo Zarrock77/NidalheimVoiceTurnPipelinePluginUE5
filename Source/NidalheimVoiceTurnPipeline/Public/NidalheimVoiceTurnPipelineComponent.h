@@ -249,7 +249,9 @@ private:
     int32 AudioReconnectAttempts = 0;
     FTimerHandle TextReconnectTimer;
     FTimerHandle AudioReconnectTimer;
+    static constexpr int32 MaxPendingTextSends = 64;
     TArray<FString> PendingTextSends;
+    static void AppendPendingSend(TArray<FString>& Queue, const FString& Json);
 
     void ConnectTextWebSocket();
     void ConnectAudioWebSocket();
