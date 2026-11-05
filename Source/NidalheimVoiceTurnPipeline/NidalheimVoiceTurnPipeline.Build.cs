@@ -16,9 +16,7 @@ public class NidalheimVoiceTurnPipeline : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] {
 			"WebSockets",
 			"HTTP", // FGenericPlatformHttp::UrlEncode
-			"Sockets",
 			"Json",
-			"JsonUtilities",
 		});
 
 		// miniaudio is vendored as a single header plus a .c translation unit that defines

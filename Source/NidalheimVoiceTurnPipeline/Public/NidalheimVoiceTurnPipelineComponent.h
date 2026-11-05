@@ -281,6 +281,4 @@ private:
     void UpdateSpatialization();
     void ResetSpeechPlayback();
     void LogSpeechPlaybackStats();
-
-    void LogResolvedAddress(const FString& WebSocketURL) const;
 };

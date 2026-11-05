@@ -18,8 +18,6 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
-#include "SocketSubsystem.h"
-#include "AddressInfoTypes.h"
 #include "UObject/UObjectIterator.h"
 
 #include "miniaudio.h"
@@ -145,49 +143,6 @@ void UNidalheimVoiceTurnPipelineComponent::RequestToken(FNidalheimVoiceTurnToken
     TokenProvider.Execute(MoveTemp(OnReady));
 }
 
-void UNidalheimVoiceTurnPipelineComponent::LogResolvedAddress(const FString& WebSocketURL) const
-{
-    FString URLWithoutScheme = WebSocketURL;
-    URLWithoutScheme.RemoveFromStart(TEXT("wss://"));
-    URLWithoutScheme.RemoveFromStart(TEXT("ws://"));
-
-    FString HostPort;
-    URLWithoutScheme.Split(TEXT("/"), &HostPort, nullptr);
-    if (HostPort.IsEmpty())
-    {
-        HostPort = URLWithoutScheme;
-    }
-
-    FString Host;
-    HostPort.Split(TEXT(":"), &Host, nullptr);
-    if (Host.IsEmpty())
-    {
-        Host = HostPort;
-    }
-
-    ISocketSubsystem* SocketSub = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
-    if (!SocketSub)
-    {
-        return;
-    }
-
-    const FAddressInfoResult Info = SocketSub->GetAddressInfo(
-        *Host,
-        nullptr,
-        EAddressInfoFlags::Default,
-        NAME_None);
-
-    if (Info.ReturnCode == SE_NO_ERROR && Info.Results.Num() > 0)
-    {
-        const TSharedRef<FInternetAddr>& Addr = Info.Results[0].Address;
-        UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("DNS resolved: %s -> %s"), *Host, *Addr->ToString(false));
-    }
-    else
-    {
-        UE_LOG(LogNidalheimVoiceTurn, Warning, TEXT("DNS resolution failed for %s (error: %d)"), *Host, static_cast<int32>(Info.ReturnCode));
-    }
-}
-
 void UNidalheimVoiceTurnPipelineComponent::ConnectTextWebSocket()
 {
     if (bShuttingDown || bTextConnecting)
@@ -263,7 +218,6 @@ void UNidalheimVoiceTurnPipelineComponent::OpenTextSocketWithToken(const FString
     TextWebSocket->OnClosed().AddUObject(this, &UNidalheimVoiceTurnPipelineComponent::OnTextClosed);
     TextWebSocket->OnMessage().AddUObject(this, &UNidalheimVoiceTurnPipelineComponent::OnTextMessageReceived);
 
-    LogResolvedAddress(BaseUrl);
     UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Connecting text WebSocket (auth'd) to base: %s"), *BaseUrl);
     TextWebSocket->Connect();
 }
@@ -291,7 +245,6 @@ void UNidalheimVoiceTurnPipelineComponent::OpenAudioSocketWithToken(const FStrin
     AudioWebSocket->OnClosed().AddUObject(this, &UNidalheimVoiceTurnPipelineComponent::OnAudioClosed);
     AudioWebSocket->OnMessage().AddUObject(this, &UNidalheimVoiceTurnPipelineComponent::OnAudioMessageReceived);
 
-    LogResolvedAddress(BaseUrl);
     UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Connecting audio WebSocket (auth'd) to base: %s"), *BaseUrl);
     AudioWebSocket->Connect();
 }
