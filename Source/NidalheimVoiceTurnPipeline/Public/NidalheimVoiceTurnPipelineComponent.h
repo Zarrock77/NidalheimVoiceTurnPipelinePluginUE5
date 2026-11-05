@@ -212,6 +212,8 @@ public:
 
 private:
     friend class FNidalheimVoiceTurnPipelineRoutingTest;
+    friend class FNidalheimVoiceTurnPipelineAudioProtocolTest;
+    friend class FNidalheimVoiceTurnPipelineReconnectTest;
 
     TSharedPtr<IWebSocket> TextWebSocket;
     TSharedPtr<IWebSocket> AudioWebSocket;

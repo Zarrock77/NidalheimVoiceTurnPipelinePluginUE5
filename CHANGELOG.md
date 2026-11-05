@@ -12,6 +12,9 @@ adheres to [Semantic Versioning](https://semver.org/).
 - A late close or error from a replaced text socket (after `SetAgentId`) no longer resets the new one.
 
 ### Changed
+- Message, transcript and NPC reply contents are no longer written to the log (only their length), so player speech does not end up in log files.
+- A `{"type":"error"}` event on the audio channel is also forwarded through `OnUnhandledServerEvent` (channel `Audio`), besides being logged.
+- The capture callback encodes the microphone buffer to Base64 directly, without an intermediate copy.
 - The send queue of the text channel keeps at most 64 messages (the oldest is dropped) and is emptied by `SetAgentId`, whose messages were meant for the previous agent.
 - Reconnection uses an exponential backoff on both channels (`TextReconnectDelaySeconds`, then x2, capped at 30 s, reset on connection) instead of a fixed 0.5 s.
 - Connecting no longer does a blocking DNS lookup just to log the resolved address; the `Sockets` and `JsonUtilities` module dependencies are dropped.

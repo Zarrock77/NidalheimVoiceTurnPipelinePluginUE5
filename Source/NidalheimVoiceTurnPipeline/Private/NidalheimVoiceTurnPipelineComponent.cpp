@@ -420,12 +420,7 @@ static void NidalheimMiniaudioCaptureCallback(ma_device* pDevice, void* /*pOutpu
     UNidalheimVoiceTurnPipelineComponent* Owner = static_cast<UNidalheimVoiceTurnPipelineComponent*>(pDevice->pUserData);
     if (!Owner) return;
 
-    const SIZE_T NumBytes = static_cast<SIZE_T>(frameCount) * sizeof(int16);
-    TArray<uint8> Raw;
-    Raw.Append(static_cast<const uint8*>(pInput), static_cast<int32>(NumBytes));
-    FString Base64 = FBase64::Encode(Raw);
-
-    Owner->SendAudioBase64(Base64);
+    Owner->SendAudioBase64(FBase64::Encode(static_cast<const uint8*>(pInput), static_cast<uint32>(frameCount * sizeof(int16))));
 }
 
 void UNidalheimVoiceTurnPipelineComponent::StartAudioCapture()
@@ -605,7 +600,7 @@ void UNidalheimVoiceTurnPipelineComponent::OnTextClosed(int32 StatusCode, const 
 
 void UNidalheimVoiceTurnPipelineComponent::OnTextMessageReceived(const FString& Message)
 {
-    UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Text message received: %s"), *Message);
+    UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Text message received (%d chars)"), Message.Len());
 
     // A typed JSON server event is forwarded to the host and never shown as dialogue.
     if (TryForwardTypedEvent(ENidalheimVoiceTurnChannel::Text, Message)) return;
@@ -703,7 +698,7 @@ void UNidalheimVoiceTurnPipelineComponent::OnAudioMessageReceived(const FString&
         FString TextData;
         if (JsonObject->TryGetStringField(TEXT("data"), TextData))
         {
-            UE_LOG(LogNidalheimVoiceTurn, Warning, TEXT(">>> NPC RESPONSE: %s"), *TextData);
+            UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("NPC response received (%d chars)"), TextData.Len());
             OnMessageReceived.Broadcast(TextData);
         }
     }
@@ -714,13 +709,15 @@ void UNidalheimVoiceTurnPipelineComponent::OnAudioMessageReceived(const FString&
         {
             UE_LOG(LogNidalheimVoiceTurn, Error, TEXT(">>> SERVER ERROR: %s"), *ErrorMsg);
         }
+        // The host may want to react to a failed turn too.
+        OnUnhandledServerEvent.Broadcast(ENidalheimVoiceTurnChannel::Audio, Type, Message);
     }
     else if (Type == TEXT("user_transcript"))
     {
         FString TranscriptData;
         if (JsonObject->TryGetStringField(TEXT("data"), TranscriptData))
         {
-            UE_LOG(LogNidalheimVoiceTurn, Warning, TEXT(">>> USER TRANSCRIPT: %s"), *TranscriptData);
+            UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("User transcript received (%d chars)"), TranscriptData.Len());
             OnUserTranscription.Broadcast(TranscriptData);
         }
     }
