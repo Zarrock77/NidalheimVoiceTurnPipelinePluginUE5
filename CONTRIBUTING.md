@@ -33,8 +33,15 @@ full history on every push/PR.
 
 ## Branches and commits
 
-- Work off a feature branch, not `main` directly — `main` is protected, a direct
-  `git push` to it is rejected by GitHub, including for the maintainer.
+- Branch flow: feature branches -> `dev` -> a `release/X.Y.Z` branch -> `main`.
+  - Work off a feature branch cut from `dev` (one per issue or pull request). Never push to `dev` or `main`
+    directly: both are protected, including for the maintainer.
+  - A pull request into `dev` is merged with **squash and merge**: one commit per change on `dev`.
+  - To ship, cut `release/X.Y.Z` from `dev`. On that branch only the version bump (`Version` and
+    `VersionName` in the `.uplugin`) and the dated CHANGELOG section change, plus fixes found while
+    testing the release.
+  - `release/X.Y.Z` is merged into `main` with a **merge commit** (not squash, not rebase), so the
+    release keeps its history. Tag `vX.Y.Z` on that merge commit, then merge `main` back into `dev`.
 - Commit messages: a short, descriptive summary line; explain *why* in the body when
   it isn't obvious from the diff.
 
@@ -43,7 +50,7 @@ full history on every push/PR.
 - Keep them small and focused.
 - Describe what changed and why; link any related issue.
 - Branch protection requires the `Scan git history` (gitleaks) check to pass and be
-  up to date with `main` before a PR is mergeable (there is no CI build, see above). No human approval is required by GitHub
+  up to date with its base branch (`dev`, or `main` for a release) before a PR is mergeable (there is no CI build, see above). No human approval is required by GitHub
   (solo-maintainer project), but the maintainer may still comment or ask for changes
   before merging.
 

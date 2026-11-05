@@ -2,7 +2,7 @@ name: Secret scan (gitleaks)
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
   schedule:
     # Full weekly sweep: a rule added later can reveal an old leak nobody has

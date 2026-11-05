@@ -6,6 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Automation tests `NidalheimVoiceTurnPipeline.AudioProtocol` (audio message routing against a hand-made playback queue) and `NidalheimVoiceTurnPipeline.Reconnect` (backoff, bounded send queue, queue cleared on agent switch).
+
+### Fixed
+- The audio channel now reconnects for good, like the text one: a failed token request, a connection error or an unexpected close schedules another attempt (it used to give up, or retry once).
+- `Connect()` does nothing when the audio channel is already open or connecting, instead of opening a second socket.
+- A late close or error from a replaced text socket (after `SetAgentId`) no longer resets the new one.
+
+### Changed
+- Message, transcript and NPC reply contents are no longer written to the log (only their length), so player speech does not end up in log files.
+- A `{"type":"error"}` event on the audio channel is also forwarded through `OnUnhandledServerEvent` (channel `Audio`), besides being logged.
+- The capture callback encodes the microphone buffer to Base64 directly, without an intermediate copy.
+- The send queue of the text channel keeps at most 64 messages (the oldest is dropped) and is emptied by `SetAgentId`, whose messages were meant for the previous agent.
+- Reconnection uses an exponential backoff on both channels (`TextReconnectDelaySeconds`, then x2, capped at 30 s, reset on connection) instead of a fixed 0.5 s.
+- Connecting no longer does a blocking DNS lookup just to log the resolved address; the `Sockets` and `JsonUtilities` module dependencies are dropped.
+
 ## [0.2.1] - 2026-10-23
 
 ### Added

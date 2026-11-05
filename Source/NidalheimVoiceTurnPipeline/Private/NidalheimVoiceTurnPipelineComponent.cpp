@@ -18,8 +18,6 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
-#include "SocketSubsystem.h"
-#include "AddressInfoTypes.h"
 #include "UObject/UObjectIterator.h"
 
 #include "miniaudio.h"
@@ -79,17 +77,13 @@ void UNidalheimVoiceTurnPipelineComponent::EndPlay(const EEndPlayReason::Type En
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().ClearTimer(TextReconnectTimer);
+        World->GetTimerManager().ClearTimer(AudioReconnectTimer);
     }
 
     StopAudioCapture();
     TearDownMiniAudioPlayback();
 
-    if (TextWebSocket.IsValid())
-    {
-        TextWebSocket->Close();
-        TextWebSocket.Reset();
-    }
-
+    CloseTextWebSocket();
     CloseAudioWebSocket();
 
     Super::EndPlay(EndPlayReason);
@@ -145,49 +139,6 @@ void UNidalheimVoiceTurnPipelineComponent::RequestToken(FNidalheimVoiceTurnToken
     TokenProvider.Execute(MoveTemp(OnReady));
 }
 
-void UNidalheimVoiceTurnPipelineComponent::LogResolvedAddress(const FString& WebSocketURL) const
-{
-    FString URLWithoutScheme = WebSocketURL;
-    URLWithoutScheme.RemoveFromStart(TEXT("wss://"));
-    URLWithoutScheme.RemoveFromStart(TEXT("ws://"));
-
-    FString HostPort;
-    URLWithoutScheme.Split(TEXT("/"), &HostPort, nullptr);
-    if (HostPort.IsEmpty())
-    {
-        HostPort = URLWithoutScheme;
-    }
-
-    FString Host;
-    HostPort.Split(TEXT(":"), &Host, nullptr);
-    if (Host.IsEmpty())
-    {
-        Host = HostPort;
-    }
-
-    ISocketSubsystem* SocketSub = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
-    if (!SocketSub)
-    {
-        return;
-    }
-
-    const FAddressInfoResult Info = SocketSub->GetAddressInfo(
-        *Host,
-        nullptr,
-        EAddressInfoFlags::Default,
-        NAME_None);
-
-    if (Info.ReturnCode == SE_NO_ERROR && Info.Results.Num() > 0)
-    {
-        const TSharedRef<FInternetAddr>& Addr = Info.Results[0].Address;
-        UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("DNS resolved: %s -> %s"), *Host, *Addr->ToString(false));
-    }
-    else
-    {
-        UE_LOG(LogNidalheimVoiceTurn, Warning, TEXT("DNS resolution failed for %s (error: %d)"), *Host, static_cast<int32>(Info.ReturnCode));
-    }
-}
-
 void UNidalheimVoiceTurnPipelineComponent::ConnectTextWebSocket()
 {
     if (bShuttingDown || bTextConnecting)
@@ -225,20 +176,33 @@ void UNidalheimVoiceTurnPipelineComponent::ConnectTextWebSocket()
 
 void UNidalheimVoiceTurnPipelineComponent::ConnectAudioWebSocket()
 {
+    if (bShuttingDown || bAudioConnecting)
+    {
+        return;
+    }
+    if (AudioWebSocket.IsValid()) // already open (connecting or connected)
+    {
+        return;
+    }
+
     if (!FModuleManager::Get().IsModuleLoaded("WebSockets"))
     {
         FModuleManager::Get().LoadModule("WebSockets");
     }
 
+    bAudioConnecting = true;
     TWeakObjectPtr<UNidalheimVoiceTurnPipelineComponent> WeakSelf(this);
     RequestToken(FNidalheimVoiceTurnTokenReady::CreateLambda(
         [WeakSelf](bool bSuccess, const FString& Token)
         {
             UNidalheimVoiceTurnPipelineComponent* Self = WeakSelf.Get();
-            if (!Self || Self->bShuttingDown) return;
+            if (!Self) return;
+            Self->bAudioConnecting = false;
+            if (Self->bShuttingDown) return;
             if (!bSuccess || Token.IsEmpty())
             {
-                UE_LOG(LogNidalheimVoiceTurn, Warning, TEXT("Audio WebSocket connect aborted - no access token"));
+                UE_LOG(LogNidalheimVoiceTurn, Warning, TEXT("Audio WebSocket connect aborted - no token, retrying"));
+                Self->ScheduleAudioReconnect();
                 return;
             }
             Self->OpenAudioSocketWithToken(Token);
@@ -263,7 +227,6 @@ void UNidalheimVoiceTurnPipelineComponent::OpenTextSocketWithToken(const FString
     TextWebSocket->OnClosed().AddUObject(this, &UNidalheimVoiceTurnPipelineComponent::OnTextClosed);
     TextWebSocket->OnMessage().AddUObject(this, &UNidalheimVoiceTurnPipelineComponent::OnTextMessageReceived);
 
-    LogResolvedAddress(BaseUrl);
     UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Connecting text WebSocket (auth'd) to base: %s"), *BaseUrl);
     TextWebSocket->Connect();
 }
@@ -291,7 +254,6 @@ void UNidalheimVoiceTurnPipelineComponent::OpenAudioSocketWithToken(const FStrin
     AudioWebSocket->OnClosed().AddUObject(this, &UNidalheimVoiceTurnPipelineComponent::OnAudioClosed);
     AudioWebSocket->OnMessage().AddUObject(this, &UNidalheimVoiceTurnPipelineComponent::OnAudioMessageReceived);
 
-    LogResolvedAddress(BaseUrl);
     UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Connecting audio WebSocket (auth'd) to base: %s"), *BaseUrl);
     AudioWebSocket->Connect();
 }
@@ -309,27 +271,24 @@ void UNidalheimVoiceTurnPipelineComponent::CloseAudioWebSocket()
     AudioWebSocket.Reset();
 }
 
-void UNidalheimVoiceTurnPipelineComponent::RequestReconnect(bool bTextChannel)
+void UNidalheimVoiceTurnPipelineComponent::CloseTextWebSocket()
 {
-    if (bShuttingDown) return;
-
-    TWeakObjectPtr<UNidalheimVoiceTurnPipelineComponent> WeakSelf(this);
-    RequestToken(FNidalheimVoiceTurnTokenReady::CreateLambda(
-        [WeakSelf, bTextChannel](bool bSuccess, const FString& Token)
-        {
-            UNidalheimVoiceTurnPipelineComponent* Self = WeakSelf.Get();
-            if (!Self || Self->bShuttingDown) return;
-            if (!bSuccess || Token.IsEmpty())
-            {
-                UE_LOG(LogNidalheimVoiceTurn, Warning, TEXT("Reconnect aborted - no access token"));
-                return;
-            }
-            if (bTextChannel) Self->OpenTextSocketWithToken(Token);
-            else Self->OpenAudioSocketWithToken(Token);
-        }));
+    if (!TextWebSocket.IsValid()) return;
+    // A late close/error from the old socket must not reset a newer one.
+    TextWebSocket->OnConnected().RemoveAll(this);
+    TextWebSocket->OnConnectionError().RemoveAll(this);
+    TextWebSocket->OnClosed().RemoveAll(this);
+    TextWebSocket->OnMessage().RemoveAll(this);
+    TextWebSocket->Close();
+    TextWebSocket.Reset();
 }
 
-void UNidalheimVoiceTurnPipelineComponent::ScheduleTextReconnect()
+float UNidalheimVoiceTurnPipelineComponent::ComputeReconnectDelay(float BaseSeconds, int32 Attempt)
+{
+    return FMath::Min(BaseSeconds * FMath::Pow(2.f, static_cast<float>(FMath::Clamp(Attempt, 0, 30))), MaxReconnectDelaySeconds);
+}
+
+void UNidalheimVoiceTurnPipelineComponent::ScheduleReconnect(FTimerHandle& Timer, int32& Attempts, void (UNidalheimVoiceTurnPipelineComponent::*Connect)())
 {
     if (bShuttingDown)
     {
@@ -341,12 +300,24 @@ void UNidalheimVoiceTurnPipelineComponent::ScheduleTextReconnect()
         return;
     }
     // Single flight: one pending attempt at a time (close + error can fire together).
-    if (World->GetTimerManager().IsTimerActive(TextReconnectTimer))
+    if (World->GetTimerManager().IsTimerActive(Timer))
     {
         return;
     }
-    World->GetTimerManager().SetTimer(TextReconnectTimer, this,
-        &UNidalheimVoiceTurnPipelineComponent::ConnectTextWebSocket, TextReconnectDelaySeconds, /*bLoop*/ false);
+    // Exponential backoff so a backend that is down is not hammered; reset once connected.
+    World->GetTimerManager().SetTimer(Timer, this, Connect,
+        ComputeReconnectDelay(TextReconnectDelaySeconds, Attempts), /*bLoop*/ false);
+    ++Attempts;
+}
+
+void UNidalheimVoiceTurnPipelineComponent::ScheduleTextReconnect()
+{
+    ScheduleReconnect(TextReconnectTimer, TextReconnectAttempts, &UNidalheimVoiceTurnPipelineComponent::ConnectTextWebSocket);
+}
+
+void UNidalheimVoiceTurnPipelineComponent::ScheduleAudioReconnect()
+{
+    ScheduleReconnect(AudioReconnectTimer, AudioReconnectAttempts, &UNidalheimVoiceTurnPipelineComponent::ConnectAudioWebSocket);
 }
 
 void UNidalheimVoiceTurnPipelineComponent::SendRawJson(const FString& Json)
@@ -356,8 +327,18 @@ void UNidalheimVoiceTurnPipelineComponent::SendRawJson(const FString& Json)
         return;
     }
     // Text channel down: keep the message, it is sent on the next OnTextConnected.
-    PendingTextSends.Add(Json);
+    AppendPendingSend(PendingTextSends, Json);
     ScheduleTextReconnect();
+}
+
+void UNidalheimVoiceTurnPipelineComponent::AppendPendingSend(TArray<FString>& Queue, const FString& Json)
+{
+    // Bounded so a long outage cannot grow the queue forever; the oldest message is the stalest.
+    if (Queue.Num() >= MaxPendingTextSends)
+    {
+        Queue.RemoveAt(0);
+    }
+    Queue.Add(Json);
 }
 
 bool UNidalheimVoiceTurnPipelineComponent::TrySendRawJson(const FString& Json)
@@ -398,18 +379,16 @@ void UNidalheimVoiceTurnPipelineComponent::SetAgentId(const FString& NewAgentId)
     UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Switching agent: %s -> %s"), *AgentId, *NewAgentId);
     AgentId = NewAgentId;
     ResetSpeechPlayback();
+    // Queued messages were meant for the previous agent.
+    PendingTextSends.Reset();
 
-    if (TextWebSocket.IsValid())
-    {
-        TextWebSocket->Close();
-        TextWebSocket.Reset();
-    }
+    CloseTextWebSocket();
     CloseAudioWebSocket();
 
-    // Text: the reconnect loop reopens with the new agent id. Audio: a single reconnection.
-    bAudioReconnectAttempted = false;
+    // A deliberate switch reconnects promptly: text through its timer, audio right away.
+    TextReconnectAttempts = AudioReconnectAttempts = 0;
     ScheduleTextReconnect();
-    RequestReconnect(false);
+    ConnectAudioWebSocket();
 }
 
 void UNidalheimVoiceTurnPipelineComponent::SendMessage(const FString& Message)
@@ -441,12 +420,7 @@ static void NidalheimMiniaudioCaptureCallback(ma_device* pDevice, void* /*pOutpu
     UNidalheimVoiceTurnPipelineComponent* Owner = static_cast<UNidalheimVoiceTurnPipelineComponent*>(pDevice->pUserData);
     if (!Owner) return;
 
-    const SIZE_T NumBytes = static_cast<SIZE_T>(frameCount) * sizeof(int16);
-    TArray<uint8> Raw;
-    Raw.Append(static_cast<const uint8*>(pInput), static_cast<int32>(NumBytes));
-    FString Base64 = FBase64::Encode(Raw);
-
-    Owner->SendAudioBase64(Base64);
+    Owner->SendAudioBase64(FBase64::Encode(static_cast<const uint8*>(pInput), static_cast<uint32>(frameCount * sizeof(int16))));
 }
 
 void UNidalheimVoiceTurnPipelineComponent::StartAudioCapture()
@@ -600,6 +574,7 @@ void UNidalheimVoiceTurnPipelineComponent::SendAudioBase64(const FString& Base64
 void UNidalheimVoiceTurnPipelineComponent::OnTextConnected()
 {
     UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Text WebSocket connected"));
+    TextReconnectAttempts = 0;
 
     // Everything requested while the socket was down goes out now (clear_history, syncs...).
     FlushPendingTextSends();
@@ -625,7 +600,7 @@ void UNidalheimVoiceTurnPipelineComponent::OnTextClosed(int32 StatusCode, const 
 
 void UNidalheimVoiceTurnPipelineComponent::OnTextMessageReceived(const FString& Message)
 {
-    UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Text message received: %s"), *Message);
+    UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Text message received (%d chars)"), Message.Len());
 
     // A typed JSON server event is forwarded to the host and never shown as dialogue.
     if (TryForwardTypedEvent(ENidalheimVoiceTurnChannel::Text, Message)) return;
@@ -652,7 +627,7 @@ bool UNidalheimVoiceTurnPipelineComponent::TryForwardTypedEvent(ENidalheimVoiceT
 void UNidalheimVoiceTurnPipelineComponent::OnAudioConnected()
 {
     UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Audio WebSocket connected - ready for push-to-talk"));
-    bAudioReconnectAttempted = false;
+    AudioReconnectAttempts = 0;
 
     EnsureMiniAudioPlaybackStarted();
     ResetSpeechPlayback();
@@ -687,7 +662,9 @@ void UNidalheimVoiceTurnPipelineComponent::OnAudioConnected()
 void UNidalheimVoiceTurnPipelineComponent::OnAudioConnectionError(const FString& Error)
 {
     ResetSpeechPlayback();
-    UE_LOG(LogNidalheimVoiceTurn, Error, TEXT("Audio WebSocket error: %s"), *Error);
+    UE_LOG(LogNidalheimVoiceTurn, Error, TEXT("Audio WebSocket error: %s - retrying"), *Error);
+    CloseAudioWebSocket();
+    ScheduleAudioReconnect();
 }
 
 void UNidalheimVoiceTurnPipelineComponent::OnAudioClosed(int32 StatusCode, const FString& Reason, bool bWasClean)
@@ -695,12 +672,8 @@ void UNidalheimVoiceTurnPipelineComponent::OnAudioClosed(int32 StatusCode, const
     ResetSpeechPlayback();
     UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Audio WebSocket closed: %d - %s (clean=%d)"), StatusCode, *Reason, bWasClean ? 1 : 0);
 
-    if (bShuttingDown || bAudioReconnectAttempted) return;
-    bAudioReconnectAttempted = true;
-
     CloseAudioWebSocket();
-    UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Attempting audio WebSocket reconnect after close"));
-    RequestReconnect(false);
+    ScheduleAudioReconnect();
 }
 
 void UNidalheimVoiceTurnPipelineComponent::OnAudioMessageReceived(const FString& Message)
@@ -725,7 +698,7 @@ void UNidalheimVoiceTurnPipelineComponent::OnAudioMessageReceived(const FString&
         FString TextData;
         if (JsonObject->TryGetStringField(TEXT("data"), TextData))
         {
-            UE_LOG(LogNidalheimVoiceTurn, Warning, TEXT(">>> NPC RESPONSE: %s"), *TextData);
+            UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("NPC response received (%d chars)"), TextData.Len());
             OnMessageReceived.Broadcast(TextData);
         }
     }
@@ -736,13 +709,15 @@ void UNidalheimVoiceTurnPipelineComponent::OnAudioMessageReceived(const FString&
         {
             UE_LOG(LogNidalheimVoiceTurn, Error, TEXT(">>> SERVER ERROR: %s"), *ErrorMsg);
         }
+        // The host may want to react to a failed turn too.
+        OnUnhandledServerEvent.Broadcast(ENidalheimVoiceTurnChannel::Audio, Type, Message);
     }
     else if (Type == TEXT("user_transcript"))
     {
         FString TranscriptData;
         if (JsonObject->TryGetStringField(TEXT("data"), TranscriptData))
         {
-            UE_LOG(LogNidalheimVoiceTurn, Warning, TEXT(">>> USER TRANSCRIPT: %s"), *TranscriptData);
+            UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("User transcript received (%d chars)"), TranscriptData.Len());
             OnUserTranscription.Broadcast(TranscriptData);
         }
     }
