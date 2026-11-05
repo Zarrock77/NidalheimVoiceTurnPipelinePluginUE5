@@ -16,9 +16,10 @@ This page says who decides what, how a contribution gets in, and what happens ne
 
 ## How a release is cut
 
-- A release is a GitHub release with a tag `vX.Y.Z`. Before tagging, `Version` and `VersionName` in the
+- A release is a `release/X.Y.Z` branch cut from `dev` and merged into `main` with a merge commit (see
+  [CONTRIBUTING.md](CONTRIBUTING.md)), then a GitHub release with a tag `vX.Y.Z` on that merge commit. Before tagging, `Version` and `VersionName` in the
   `.uplugin` and the dated section of the CHANGELOG must say the same version.
-- A release is worth cutting when a user-visible change has been merged on `main` (a feature or a fix).
+- A release is worth cutting when a user-visible change has been merged on `dev` (a feature or a fix).
   The maintainer decides when.
 - The plugin is `0.x`: a change that breaks the public API (component properties, delegates) bumps the minor version and is listed under `Changed` in the CHANGELOG.
 
