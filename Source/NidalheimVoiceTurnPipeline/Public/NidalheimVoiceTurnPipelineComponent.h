@@ -104,7 +104,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoiceTurn|Connection")
     FString AgentQueryParam = TEXT("npc");
 
-    /** Retry delay while the text WebSocket is not connected. */
+    /** First retry delay while a WebSocket is not connected; doubles on each failed attempt, capped at 30 s. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoiceTurn|Connection", meta = (ClampMin = "0.1"))
     float TextReconnectDelaySeconds = 0.5f;
 
@@ -237,27 +237,35 @@ private:
     FCriticalSection AudioWsSendCS;
 
     bool bIsCapturingAudio = false;
-    bool bAudioReconnectAttempted = false;
     bool bShuttingDown = false;
 
-    // Persistent text connection: retried every TextReconnectDelaySeconds while down, queued sends
-    // flushed on (re)connection. bTextConnecting prevents two concurrent connection attempts.
+    // Both channels reconnect forever with exponential backoff (one counter per channel, reset on
+    // connection). bTextConnecting / bAudioConnecting prevent two concurrent connection attempts.
+    // Text sends made while down are queued and flushed on (re)connection.
+    static constexpr float MaxReconnectDelaySeconds = 30.f;
     bool bTextConnecting = false;
+    bool bAudioConnecting = false;
+    int32 TextReconnectAttempts = 0;
+    int32 AudioReconnectAttempts = 0;
     FTimerHandle TextReconnectTimer;
+    FTimerHandle AudioReconnectTimer;
     TArray<FString> PendingTextSends;
 
     void ConnectTextWebSocket();
     void ConnectAudioWebSocket();
     void OpenTextSocketWithToken(const FString& AccessToken);
     void OpenAudioSocketWithToken(const FString& AccessToken);
+    void CloseTextWebSocket();
     void CloseAudioWebSocket();
-    void RequestReconnect(bool bTextChannel);
     void RequestToken(FNidalheimVoiceTurnTokenReady OnReady);
     FString ResolveBaseUrl(const FString& OverrideUrl, const TCHAR* Key, const TCHAR* LegacyKey) const;
     static FString BuildWsUrl(const FString& BaseUrl, const FString& AccessToken, const FString& InAgentId,
         const FString& TokenParam, const FString& AgentParam);
 
+    static float ComputeReconnectDelay(float BaseSeconds, int32 Attempt);
+    void ScheduleReconnect(FTimerHandle& Timer, int32& Attempts, void (UNidalheimVoiceTurnPipelineComponent::*Connect)());
     void ScheduleTextReconnect();
+    void ScheduleAudioReconnect();
     void FlushPendingTextSends();
 
     void OnTextConnected();

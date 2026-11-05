@@ -13,7 +13,7 @@ logic (quests, inventory, authentication...) to the host.
 
 `UNidalheimVoiceTurnPipelineComponent`, an `UActorComponent` you can put on any actor, that provides:
 
-- **Two WebSocket channels**, `/text` and `/audio`, with automatic reconnection of the text channel and
+- **Two WebSocket channels**, `/text` and `/audio`, with automatic reconnection of both channels (exponential backoff) and
   a send queue that survives reconnections.
 - **Push-to-talk capture** through [miniaudio](https://miniaud.io) (WASAPI, ~25-30 ms): the microphone is
   streamed as base64 PCM16 mono, and `COMMIT` ends the utterance.
@@ -136,7 +136,7 @@ the text channel, which is the moment to push state snapshots. Send your own mes
 | `ConfigSection` | project name | `DefaultGame.ini` section holding the URLs |
 | `TextBaseUrl` / `AudioBaseUrl` | empty | Override the ini |
 | `TokenQueryParam` / `AgentQueryParam` | `token` / `npc` | Query parameter names |
-| `TextReconnectDelaySeconds` | `0.5` | Text channel retry delay |
+| `TextReconnectDelaySeconds` | `0.5` | First retry delay of both channels (doubles per failure, capped at 30 s) |
 | `CaptureSampleRate` | `48000` | Microphone rate declared in `audio_config` (Hz) |
 | `bSpatialize` | `false` | Play the voice in 3D (off: centered, full volume) |
 | `SpatialMinDistance` / `SpatialMaxDistance` | `200` / `1500` | Full volume inside the first (cm), silent past the second |

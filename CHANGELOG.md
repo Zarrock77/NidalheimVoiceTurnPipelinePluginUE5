@@ -6,7 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- The audio channel now reconnects for good, like the text one: a failed token request, a connection error or an unexpected close schedules another attempt (it used to give up, or retry once).
+- `Connect()` does nothing when the audio channel is already open or connecting, instead of opening a second socket.
+- A late close or error from a replaced text socket (after `SetAgentId`) no longer resets the new one.
+
 ### Changed
+- Reconnection uses an exponential backoff on both channels (`TextReconnectDelaySeconds`, then x2, capped at 30 s, reset on connection) instead of a fixed 0.5 s.
 - Connecting no longer does a blocking DNS lookup just to log the resolved address; the `Sockets` and `JsonUtilities` module dependencies are dropped.
 
 ## [0.2.1] - 2026-10-23

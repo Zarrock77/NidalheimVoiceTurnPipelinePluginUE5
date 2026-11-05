@@ -77,17 +77,13 @@ void UNidalheimVoiceTurnPipelineComponent::EndPlay(const EEndPlayReason::Type En
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().ClearTimer(TextReconnectTimer);
+        World->GetTimerManager().ClearTimer(AudioReconnectTimer);
     }
 
     StopAudioCapture();
     TearDownMiniAudioPlayback();
 
-    if (TextWebSocket.IsValid())
-    {
-        TextWebSocket->Close();
-        TextWebSocket.Reset();
-    }
-
+    CloseTextWebSocket();
     CloseAudioWebSocket();
 
     Super::EndPlay(EndPlayReason);
@@ -180,20 +176,33 @@ void UNidalheimVoiceTurnPipelineComponent::ConnectTextWebSocket()
 
 void UNidalheimVoiceTurnPipelineComponent::ConnectAudioWebSocket()
 {
+    if (bShuttingDown || bAudioConnecting)
+    {
+        return;
+    }
+    if (AudioWebSocket.IsValid()) // already open (connecting or connected)
+    {
+        return;
+    }
+
     if (!FModuleManager::Get().IsModuleLoaded("WebSockets"))
     {
         FModuleManager::Get().LoadModule("WebSockets");
     }
 
+    bAudioConnecting = true;
     TWeakObjectPtr<UNidalheimVoiceTurnPipelineComponent> WeakSelf(this);
     RequestToken(FNidalheimVoiceTurnTokenReady::CreateLambda(
         [WeakSelf](bool bSuccess, const FString& Token)
         {
             UNidalheimVoiceTurnPipelineComponent* Self = WeakSelf.Get();
-            if (!Self || Self->bShuttingDown) return;
+            if (!Self) return;
+            Self->bAudioConnecting = false;
+            if (Self->bShuttingDown) return;
             if (!bSuccess || Token.IsEmpty())
             {
-                UE_LOG(LogNidalheimVoiceTurn, Warning, TEXT("Audio WebSocket connect aborted - no access token"));
+                UE_LOG(LogNidalheimVoiceTurn, Warning, TEXT("Audio WebSocket connect aborted - no token, retrying"));
+                Self->ScheduleAudioReconnect();
                 return;
             }
             Self->OpenAudioSocketWithToken(Token);
@@ -262,27 +271,24 @@ void UNidalheimVoiceTurnPipelineComponent::CloseAudioWebSocket()
     AudioWebSocket.Reset();
 }
 
-void UNidalheimVoiceTurnPipelineComponent::RequestReconnect(bool bTextChannel)
+void UNidalheimVoiceTurnPipelineComponent::CloseTextWebSocket()
 {
-    if (bShuttingDown) return;
-
-    TWeakObjectPtr<UNidalheimVoiceTurnPipelineComponent> WeakSelf(this);
-    RequestToken(FNidalheimVoiceTurnTokenReady::CreateLambda(
-        [WeakSelf, bTextChannel](bool bSuccess, const FString& Token)
-        {
-            UNidalheimVoiceTurnPipelineComponent* Self = WeakSelf.Get();
-            if (!Self || Self->bShuttingDown) return;
-            if (!bSuccess || Token.IsEmpty())
-            {
-                UE_LOG(LogNidalheimVoiceTurn, Warning, TEXT("Reconnect aborted - no access token"));
-                return;
-            }
-            if (bTextChannel) Self->OpenTextSocketWithToken(Token);
-            else Self->OpenAudioSocketWithToken(Token);
-        }));
+    if (!TextWebSocket.IsValid()) return;
+    // A late close/error from the old socket must not reset a newer one.
+    TextWebSocket->OnConnected().RemoveAll(this);
+    TextWebSocket->OnConnectionError().RemoveAll(this);
+    TextWebSocket->OnClosed().RemoveAll(this);
+    TextWebSocket->OnMessage().RemoveAll(this);
+    TextWebSocket->Close();
+    TextWebSocket.Reset();
 }
 
-void UNidalheimVoiceTurnPipelineComponent::ScheduleTextReconnect()
+float UNidalheimVoiceTurnPipelineComponent::ComputeReconnectDelay(float BaseSeconds, int32 Attempt)
+{
+    return FMath::Min(BaseSeconds * FMath::Pow(2.f, static_cast<float>(FMath::Clamp(Attempt, 0, 30))), MaxReconnectDelaySeconds);
+}
+
+void UNidalheimVoiceTurnPipelineComponent::ScheduleReconnect(FTimerHandle& Timer, int32& Attempts, void (UNidalheimVoiceTurnPipelineComponent::*Connect)())
 {
     if (bShuttingDown)
     {
@@ -294,12 +300,24 @@ void UNidalheimVoiceTurnPipelineComponent::ScheduleTextReconnect()
         return;
     }
     // Single flight: one pending attempt at a time (close + error can fire together).
-    if (World->GetTimerManager().IsTimerActive(TextReconnectTimer))
+    if (World->GetTimerManager().IsTimerActive(Timer))
     {
         return;
     }
-    World->GetTimerManager().SetTimer(TextReconnectTimer, this,
-        &UNidalheimVoiceTurnPipelineComponent::ConnectTextWebSocket, TextReconnectDelaySeconds, /*bLoop*/ false);
+    // Exponential backoff so a backend that is down is not hammered; reset once connected.
+    World->GetTimerManager().SetTimer(Timer, this, Connect,
+        ComputeReconnectDelay(TextReconnectDelaySeconds, Attempts), /*bLoop*/ false);
+    ++Attempts;
+}
+
+void UNidalheimVoiceTurnPipelineComponent::ScheduleTextReconnect()
+{
+    ScheduleReconnect(TextReconnectTimer, TextReconnectAttempts, &UNidalheimVoiceTurnPipelineComponent::ConnectTextWebSocket);
+}
+
+void UNidalheimVoiceTurnPipelineComponent::ScheduleAudioReconnect()
+{
+    ScheduleReconnect(AudioReconnectTimer, AudioReconnectAttempts, &UNidalheimVoiceTurnPipelineComponent::ConnectAudioWebSocket);
 }
 
 void UNidalheimVoiceTurnPipelineComponent::SendRawJson(const FString& Json)
@@ -352,17 +370,13 @@ void UNidalheimVoiceTurnPipelineComponent::SetAgentId(const FString& NewAgentId)
     AgentId = NewAgentId;
     ResetSpeechPlayback();
 
-    if (TextWebSocket.IsValid())
-    {
-        TextWebSocket->Close();
-        TextWebSocket.Reset();
-    }
+    CloseTextWebSocket();
     CloseAudioWebSocket();
 
-    // Text: the reconnect loop reopens with the new agent id. Audio: a single reconnection.
-    bAudioReconnectAttempted = false;
+    // A deliberate switch reconnects promptly: text through its timer, audio right away.
+    TextReconnectAttempts = AudioReconnectAttempts = 0;
     ScheduleTextReconnect();
-    RequestReconnect(false);
+    ConnectAudioWebSocket();
 }
 
 void UNidalheimVoiceTurnPipelineComponent::SendMessage(const FString& Message)
@@ -553,6 +567,7 @@ void UNidalheimVoiceTurnPipelineComponent::SendAudioBase64(const FString& Base64
 void UNidalheimVoiceTurnPipelineComponent::OnTextConnected()
 {
     UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Text WebSocket connected"));
+    TextReconnectAttempts = 0;
 
     // Everything requested while the socket was down goes out now (clear_history, syncs...).
     FlushPendingTextSends();
@@ -605,7 +620,7 @@ bool UNidalheimVoiceTurnPipelineComponent::TryForwardTypedEvent(ENidalheimVoiceT
 void UNidalheimVoiceTurnPipelineComponent::OnAudioConnected()
 {
     UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Audio WebSocket connected - ready for push-to-talk"));
-    bAudioReconnectAttempted = false;
+    AudioReconnectAttempts = 0;
 
     EnsureMiniAudioPlaybackStarted();
     ResetSpeechPlayback();
@@ -640,7 +655,9 @@ void UNidalheimVoiceTurnPipelineComponent::OnAudioConnected()
 void UNidalheimVoiceTurnPipelineComponent::OnAudioConnectionError(const FString& Error)
 {
     ResetSpeechPlayback();
-    UE_LOG(LogNidalheimVoiceTurn, Error, TEXT("Audio WebSocket error: %s"), *Error);
+    UE_LOG(LogNidalheimVoiceTurn, Error, TEXT("Audio WebSocket error: %s - retrying"), *Error);
+    CloseAudioWebSocket();
+    ScheduleAudioReconnect();
 }
 
 void UNidalheimVoiceTurnPipelineComponent::OnAudioClosed(int32 StatusCode, const FString& Reason, bool bWasClean)
@@ -648,12 +665,8 @@ void UNidalheimVoiceTurnPipelineComponent::OnAudioClosed(int32 StatusCode, const
     ResetSpeechPlayback();
     UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Audio WebSocket closed: %d - %s (clean=%d)"), StatusCode, *Reason, bWasClean ? 1 : 0);
 
-    if (bShuttingDown || bAudioReconnectAttempted) return;
-    bAudioReconnectAttempted = true;
-
     CloseAudioWebSocket();
-    UE_LOG(LogNidalheimVoiceTurn, Log, TEXT("Attempting audio WebSocket reconnect after close"));
-    RequestReconnect(false);
+    ScheduleAudioReconnect();
 }
 
 void UNidalheimVoiceTurnPipelineComponent::OnAudioMessageReceived(const FString& Message)
