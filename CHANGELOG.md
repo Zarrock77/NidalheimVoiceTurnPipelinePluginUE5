@@ -6,6 +6,9 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Automation tests `NidalheimVoiceTurnPipeline.AudioProtocol` (audio message routing against a hand-made playback queue) and `NidalheimVoiceTurnPipeline.Reconnect` (backoff, bounded send queue, queue cleared on agent switch).
+
 ### Fixed
 - The audio channel now reconnects for good, like the text one: a failed token request, a connection error or an unexpected close schedules another attempt (it used to give up, or retry once).
 - `Connect()` does nothing when the audio channel is already open or connecting, instead of opening a second socket.
